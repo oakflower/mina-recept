@@ -1,0 +1,14 @@
+{
+  "name": "mina-recept",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Spara, hitta och återanvända egna recept",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
+  }
+}
