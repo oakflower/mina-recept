@@ -1,12 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
 const { createApp } = require('../lib/app');
 const { createStore } = require('../lib/store');
 const { makeTempFilePath, sampleRecipe } = require('./helpers');
 
 // Starts the app on a random port with its own temp file; returns a small client.
-async function startServer(random = () => 0) {
-  const store = createStore(makeTempFilePath(), random);
+async function startServer(random = () => 0, filePath = makeTempFilePath()) {
+  const store = createStore(filePath, random);
   const server = createApp(store).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   const baseUrl = `http://localhost:${server.address().port}`;
@@ -30,8 +31,8 @@ async function startServer(random = () => 0) {
   return { call, close };
 }
 
-async function withServer(testBody, random) {
-  const server = await startServer(random);
+async function withServer(testBody, random, filePath) {
+  const server = await startServer(random, filePath);
   try {
     await testBody(server.call);
   } finally {
@@ -158,4 +159,25 @@ test('POST /api/import returns 400 and saves nothing for an unusable file', () =
 
     const list = await call('GET', '/api/recipes');
     assert.deepStrictEqual(list.body, []);
+  }));
+
+test('API returns 500 with a Swedish message when the recipe file is corrupt, and leaves it untouched', () => {
+  const filePath = makeTempFilePath();
+  fs.writeFileSync(filePath, '{ not json', 'utf8');
+  return withServer(async (call) => {
+    const list = await call('GET', '/api/recipes');
+    assert.strictEqual(list.status, 500);
+    assert.deepStrictEqual(list.body.errors, ['Receptfilen kunde inte läsas.']);
+
+    const create = await call('POST', '/api/recipes', sampleRecipe());
+    assert.strictEqual(create.status, 500);
+    assert.strictEqual(fs.readFileSync(filePath, 'utf8'), '{ not json');
+  }, undefined, filePath);
+});
+
+test('POST /api/import returns 413 for a body over the size limit', () =>
+  withServer(async (call) => {
+    const response = await call('POST', '/api/import', { text: 'x'.repeat(1024 * 1024 + 1) });
+    assert.strictEqual(response.status, 413);
+    assert.deepStrictEqual(response.body.errors, ['Filen är för stor (högst 1 MB).']);
   }));

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
-const { createStore } = require('../lib/store');
+const { createStore, StorageError } = require('../lib/store');
 const { makeTempFilePath, sampleRecipe } = require('./helpers');
 
 test('create assigns an id and the recipe can be read back', () => {
@@ -107,5 +107,23 @@ test('writing leaves no temp file behind', () => {
   const filePath = makeTempFilePath();
   createStore(filePath).create(sampleRecipe());
   assert.ok(fs.existsSync(filePath));
+  assert.ok(!fs.existsSync(`${filePath}.tmp`));
+});
+
+test('a corrupt file throws a StorageError and is left untouched', () => {
+  const filePath = makeTempFilePath();
+  fs.writeFileSync(filePath, '{ not json', 'utf8');
+  const store = createStore(filePath);
+  assert.throws(() => store.list(), StorageError);
+  assert.throws(() => store.create(sampleRecipe()), StorageError);
+  assert.strictEqual(fs.readFileSync(filePath, 'utf8'), '{ not json');
+});
+
+test('a failed write throws a StorageError and leaves no temp file', () => {
+  const blockingFile = makeTempFilePath();
+  fs.writeFileSync(blockingFile, 'i am a file, not a directory', 'utf8');
+  const filePath = `${blockingFile}${require('node:path').sep}recipes.json`;
+  const store = createStore(filePath);
+  assert.throws(() => store.create(sampleRecipe()), StorageError);
   assert.ok(!fs.existsSync(`${filePath}.tmp`));
 });
