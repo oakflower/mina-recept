@@ -26,9 +26,14 @@ async function api(method, path, body) {
     options.headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
-  const response = await fetch(`/api${path}`, options);
-  const data = response.status === 204 ? null : await response.json();
-  return { ok: response.ok, status: response.status, data };
+  try {
+    const response = await fetch(`/api${path}`, options);
+    const data = response.status === 204 ? null : await response.json();
+    return { ok: response.ok, status: response.status, data };
+  } catch (error) {
+    // Network failure or a non-JSON response: report it like any other API error.
+    return { ok: false, status: 0, data: { errors: ['Kunde inte nå servern. Försök igen.'] } };
+  }
 }
 
 function queryString(filter) {
@@ -64,10 +69,26 @@ function formatMeta(recipe) {
   return parts.join(' · ');
 }
 
-async function randomRecipe(filter) {
+// Shown instead of a page when a recipe could not be loaded.
+function showLoadFailure(result) {
+  if (result.status === 404) {
+    setPage('Hittades inte', el('h1', {}, 'Receptet finns inte'), el('a', { href: '#/' }, 'Till alla recept'));
+    return;
+  }
+  const errorBox = el('div', { role: 'alert' });
+  showErrors(errorBox, result.data.errors);
+  setPage('Något gick fel', el('h1', {}, 'Något gick fel'), errorBox, el('a', { href: '#/' }, 'Till alla recept'));
+}
+
+// Picks a random recipe and opens it, or shows why it could not.
+async function openRandomRecipe(filter, errorBox) {
   const result = await api('GET', `/recipes/random${queryString(filter)}`);
-  if (!result.ok) return null;
-  return result.data;
+  if (result.ok) {
+    location.hash = `#/recept/${result.data.id}${queryString(filter)}`;
+    return;
+  }
+  const errors = result.status === 404 ? ['Inga recept att slumpa bland.'] : result.data.errors;
+  showErrors(errorBox, errors);
 }
 
 // ---------- List view ----------
@@ -90,6 +111,11 @@ async function showList(initialFilter) {
   async function refresh() {
     rememberFilter();
     const result = await api('GET', `/recipes${queryString(filter)}`);
+    if (!result.ok) {
+      showErrors(errorBox, result.data.errors);
+      return;
+    }
+    showErrors(errorBox, []);
     renderResults(result.data);
   }
 
@@ -116,10 +142,8 @@ async function showList(initialFilter) {
     tagContainer.replaceChildren(...buttons);
   }
 
-  async function onRandomClick() {
-    const recipe = await randomRecipe(filter);
-    if (recipe) location.hash = `#/recept/${recipe.id}${queryString(filter)}`;
-    else showErrors(errorBox, ['Inga recept att slumpa bland.']);
+  function onRandomClick() {
+    return openRandomRecipe(filter, errorBox);
   }
 
   async function onFileChosen(event) {
@@ -148,7 +172,7 @@ async function showList(initialFilter) {
       el('input', { type: 'file', id: 'import-file', accept: '.txt,.csv,text/plain,text/csv', onchange: onFileChosen })));
 
   const [tags] = await Promise.all([api('GET', '/tags'), refresh()]);
-  renderTags(tags.data);
+  if (tags.ok) renderTags(tags.data);
 }
 
 // ---------- Recipe view ----------
@@ -156,16 +180,14 @@ async function showList(initialFilter) {
 async function showRecipe(id, filter) {
   const result = await api('GET', `/recipes/${id}`);
   if (!result.ok) {
-    setPage('Hittades inte', el('h1', {}, 'Receptet finns inte'), el('a', { href: '#/' }, 'Till alla recept'));
+    showLoadFailure(result);
     return;
   }
   const recipe = result.data;
   const errorBox = el('div', { role: 'alert' });
 
-  async function onRandomClick() {
-    const next = await randomRecipe(filter);
-    if (next) location.hash = `#/recept/${next.id}${queryString(filter)}`;
-    else showErrors(errorBox, ['Inga recept att slumpa bland.']);
+  function onRandomClick() {
+    return openRandomRecipe(filter, errorBox);
   }
 
   async function onDeleteClick() {
@@ -273,7 +295,7 @@ async function showForm(id) {
   if (id) {
     const result = await api('GET', `/recipes/${id}`);
     if (!result.ok) {
-      setPage('Hittades inte', el('h1', {}, 'Receptet finns inte'), el('a', { href: '#/' }, 'Till alla recept'));
+      showLoadFailure(result);
       return;
     }
     recipe = result.data;
