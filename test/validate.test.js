@@ -68,6 +68,36 @@ test('duplicate tags are removed ignoring case', () => {
   assert.deepStrictEqual(value.tags, ['Middag', 'Snabbt']);
 });
 
+test('values at the limit are accepted and values over it are rejected', () => {
+  const atLimit = sampleRecipe({ title: 'a'.repeat(200), steps: ['b'.repeat(2000)] });
+  assert.strictEqual(normalizeRecipe(atLimit).errors, undefined);
+
+  const long = (length) => 'x'.repeat(length);
+  const cases = [
+    [{ title: long(201) }, 'Titeln får vara högst 200 tecken.'],
+    [{ description: long(5001) }, 'Beskrivningen får vara högst 5000 tecken.'],
+    [{ steps: [long(2001)] }, 'Varje steg får vara högst 2000 tecken.'],
+    [{ tags: [long(51)] }, 'Varje tagg får vara högst 50 tecken.'],
+    [{ ingredients: [{ amount: '', unit: '', name: long(201) }] }, 'Ingrediensnamn får vara högst 200 tecken.'],
+    [{ ingredients: [{ amount: long(51), unit: '', name: 'Salt' }] }, 'Mängd får vara högst 50 tecken.'],
+    [{ ingredients: [{ amount: '', unit: long(51), name: 'Salt' }] }, 'Enhet får vara högst 50 tecken.'],
+  ];
+  for (const [overrides, message] of cases) {
+    assert.ok(normalizeRecipe(sampleRecipe(overrides)).errors.includes(message), message);
+  }
+});
+
+test('too many ingredients, steps or tags are rejected', () => {
+  const ingredient = { amount: '1', unit: 'dl', name: 'Vatten' };
+  const manyIngredients = Array.from({ length: 101 }, () => ingredient);
+  const manySteps = Array.from({ length: 101 }, (_, i) => `Steg ${i}`);
+  const manyTags = Array.from({ length: 21 }, (_, i) => `tagg${i}`);
+
+  assert.ok(normalizeRecipe(sampleRecipe({ ingredients: manyIngredients })).errors.includes('Ett recept får ha högst 100 ingredienser.'));
+  assert.ok(normalizeRecipe(sampleRecipe({ steps: manySteps })).errors.includes('Ett recept får ha högst 100 steg.'));
+  assert.ok(normalizeRecipe(sampleRecipe({ tags: manyTags })).errors.includes('Ett recept får ha högst 20 taggar.'));
+});
+
 test('non-object input is rejected without crashing', () => {
   assert.ok(normalizeRecipe(null).errors);
   assert.ok(normalizeRecipe('hej').errors);
