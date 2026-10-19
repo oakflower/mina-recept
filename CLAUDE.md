@@ -7,6 +7,7 @@ The first version is for a single user, with no login. Users and sharing may com
 
 ### Scope
 - **MVP:** create, view, edit and delete recipes (title, description, ingredients with amount/unit/name, steps, servings, cooking time), free-text search on title and ingredients, tags/categories, and a "random recipe" function that picks a recipe at random from the saved ones (optionally within the current tag/search filter).
+- **Also built:** import of a recipe from an uploaded `.txt`/`.csv` file (`lib/importer.js`, `POST /api/import`, template in `public/mall.txt`). The file format is described by the template and the README.
 - **Later:** image, favorites, scaling servings, import from URL.
 - **Far future:** login, sharing, shopping list, weekly menu.
 
@@ -22,6 +23,19 @@ Why:
 - `better-sqlite3` could not be installed in the development environment (Node 18 on Windows, no C++ toolchain), hence file-based storage.
 - The storage layer is isolated so a real database can be swapped in later without touching the API.
 
+## Project structure
+- `server.js` – starts the server with the real storage file.
+- `lib/app.js` – the Express app (routes). Takes a store as argument so tests can inject one.
+- `lib/store.js` – the storage layer.
+- `lib/validate.js` – validation and normalization of recipe input.
+- `lib/importer.js` – turns the text of an uploaded file into recipe input.
+- `public/` – the frontend (`index.html`, `app.js`, `style.css`) and the import template `mall.txt`. Note that `public/app.js` is the frontend; the backend app is `lib/app.js`.
+- `test/` – tests, with shared helpers in `test/helpers.js`.
+
+## Conventions
+- Code, identifiers and comments are in English. Everything the user sees (UI text and API error messages) is in Swedish.
+- Error responses from the API have the shape `{ "errors": ["Swedish message", ...] }`.
+
 ## Simplicity
 - Prefer the simplest solution that meets the current requirement. If two approaches work, choose the one with fewer parts.
 - Do not build for hypothetical future requirements. Features listed under "Later" and "Far future" are not a reason to add abstractions, configuration options or extension points now; build them when they are actually requested.
@@ -31,6 +45,7 @@ Why:
 ## Architecture principles
 - All reading/writing of data happens in the storage layer (`store.js`). Routes and frontend never touch the file directly.
 - Validation and normalization of input happens in one place on the server, before data reaches storage.
+- File import only parses text into recipe input. The result always goes through `normalizeRecipe` before it is saved, the same as input from the API. Keep the heading names in `lib/importer.js`, `public/mall.txt` and the README in sync.
 - No mutable global variables; pass data as arguments.
 - Functions do one thing and are small.
 - Write the storage file atomically (write a temp file, then rename) so data is not corrupted.
