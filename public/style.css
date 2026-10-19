@@ -86,6 +86,9 @@ a { color: var(--accent); }
 
 /* Form fields */
 label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+/* Labels that wrap their field: the text sits above the field, the field is not bold. */
+.label-text { display: block; margin-bottom: 0.25rem; }
+label input, label textarea { font-weight: 400; }
 
 input[type="text"], input[type="search"], input[type="number"], textarea {
   width: 100%;

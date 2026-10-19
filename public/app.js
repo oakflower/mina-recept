@@ -198,21 +198,54 @@ async function showRecipe(id, filter) {
 
 // ---------- Create / edit form ----------
 
-function ingredientRow(ingredient = { amount: '', unit: '', name: '' }) {
-  const row = el('div', { class: 'ingredient-row', 'data-row': 'ingredient' },
-    el('div', {}, el('label', {}, 'Mängd'), el('input', { type: 'text', 'data-field': 'amount', value: ingredient.amount, inputmode: 'decimal' })),
-    el('div', {}, el('label', {}, 'Enhet'), el('input', { type: 'text', 'data-field': 'unit', value: ingredient.unit })),
-    el('div', { class: 'name-field' }, el('label', {}, 'Ingrediens'), el('input', { type: 'text', 'data-field': 'name', value: ingredient.name })),
-    el('div', {}, el('button', { type: 'button', class: 'button danger row-remove', onclick: () => row.remove() }, 'Ta bort ingrediens')));
-  return row;
+// A label that wraps its field, so the field gets an accessible name without needing an id.
+function labeledField(labelText, field) {
+  return el('label', {}, el('span', { class: 'label-text' }, labelText), field);
 }
 
-function stepRow(text = '') {
-  const row = el('div', { class: 'step-row', 'data-row': 'step' },
-    el('label', {}, 'Steg'),
-    el('textarea', { 'data-field': 'text' }, text),
-    el('button', { type: 'button', class: 'button danger row-remove', onclick: () => row.remove() }, 'Ta bort steg'));
-  return row;
+function ingredientRow(ingredient = { amount: '', unit: '', name: '' }, onRemove) {
+  return el('div', { class: 'ingredient-row', 'data-row': 'ingredient' },
+    el('div', {}, labeledField('Mängd', el('input', { type: 'text', 'data-field': 'amount', value: ingredient.amount, inputmode: 'decimal' }))),
+    el('div', {}, labeledField('Enhet', el('input', { type: 'text', 'data-field': 'unit', value: ingredient.unit }))),
+    el('div', { class: 'name-field' }, labeledField('Ingrediens', el('input', { type: 'text', 'data-field': 'name', value: ingredient.name }))),
+    el('div', {}, el('button', { type: 'button', class: 'button danger row-remove', onclick: onRemove }, 'Ta bort ingrediens')));
+}
+
+function stepRow(text = '', onRemove) {
+  return el('div', { class: 'step-row', 'data-row': 'step' },
+    labeledField('Steg', el('textarea', { 'data-field': 'text' }, text)),
+    el('button', { type: 'button', class: 'button danger row-remove', onclick: onRemove }, 'Ta bort steg'));
+}
+
+// A list of rows the user can add to and remove from. Returns [rowsContainer, addButton].
+// The remove buttons are numbered ("Ta bort ingrediens 2") so they can be told apart.
+function editableList({ noun, addLabel, makeRow, items }) {
+  const rows = el('div');
+  const addButton = el('button', { type: 'button', class: 'button', onclick: onAddClick }, addLabel);
+
+  function numberRemoveButtons() {
+    [...rows.children].forEach((row, index) => {
+      row.querySelector('.row-remove').setAttribute('aria-label', `Ta bort ${noun} ${index + 1}`);
+    });
+  }
+
+  function addRow(item) {
+    const row = makeRow(item, () => {
+      row.remove();
+      numberRemoveButtons();
+      addButton.focus();
+    });
+    rows.append(row);
+    numberRemoveButtons();
+    return row;
+  }
+
+  function onAddClick() {
+    addRow().querySelector('input, textarea').focus();
+  }
+
+  items.forEach((item) => addRow(item));
+  return [rows, addButton];
 }
 
 function fieldValue(root, name) {
@@ -247,8 +280,14 @@ async function showForm(id) {
   }
 
   const errorBox = el('div', { role: 'alert' });
-  const ingredientRows = el('div', {}, (recipe.ingredients.length ? recipe.ingredients : [undefined]).map(ingredientRow));
-  const stepRows = el('div', {}, (recipe.steps.length ? recipe.steps : ['']).map(stepRow));
+  const ingredientList = editableList({
+    noun: 'ingrediens', addLabel: 'Lägg till ingrediens', makeRow: ingredientRow,
+    items: recipe.ingredients.length ? recipe.ingredients : [undefined],
+  });
+  const stepList = editableList({
+    noun: 'steg', addLabel: 'Lägg till steg', makeRow: stepRow,
+    items: recipe.steps.length ? recipe.steps : [''],
+  });
 
   async function onSubmit(event) {
     event.preventDefault();
@@ -268,10 +307,8 @@ async function showForm(id) {
       el('div', { class: 'field' }, el('label', { for: 'servings' }, 'Portioner'), el('input', { type: 'number', min: '1', id: 'servings', 'data-field': 'servings', value: recipe.servings ?? '' })),
       el('div', { class: 'field' }, el('label', { for: 'time' }, 'Tid (minuter)'), el('input', { type: 'number', min: '1', id: 'time', 'data-field': 'cookingTimeMinutes', value: recipe.cookingTimeMinutes ?? '' }))),
     el('div', { class: 'field' }, el('label', { for: 'tags' }, 'Taggar (separera med komma)'), el('input', { type: 'text', id: 'tags', 'data-field': 'tags', value: recipe.tags.join(', ') })),
-    el('fieldset', {}, el('legend', {}, 'Ingredienser'), ingredientRows,
-      el('button', { type: 'button', class: 'button', onclick: () => ingredientRows.append(ingredientRow()) }, 'Lägg till ingrediens')),
-    el('fieldset', {}, el('legend', {}, 'Steg'), stepRows,
-      el('button', { type: 'button', class: 'button', onclick: () => stepRows.append(stepRow()) }, 'Lägg till steg')),
+    el('fieldset', {}, el('legend', {}, 'Ingredienser'), ingredientList),
+    el('fieldset', {}, el('legend', {}, 'Steg'), stepList),
     errorBox,
     el('div', { class: 'actions' },
       el('button', { type: 'submit', class: 'button primary' }, 'Spara'),
