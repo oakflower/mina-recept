@@ -43,6 +43,26 @@ test('servings and time are optional but must be positive numbers', () => {
   assert.strictEqual(normalizeRecipe(sampleRecipe({ servings: '4' })).value.servings, 4);
 });
 
+test('a null ingredient is treated as an empty row instead of crashing', () => {
+  const { errors } = normalizeRecipe(sampleRecipe({ ingredients: [null] }));
+  assert.ok(errors.includes('Minst en ingrediens krävs.'));
+});
+
+test('a null amount becomes an empty string and a numeric amount is kept', () => {
+  const { value } = normalizeRecipe(
+    sampleRecipe({
+      ingredients: [
+        { amount: null, unit: '', name: 'Salt' },
+        { amount: 0.5, unit: 'dl', name: 'Mjölk' },
+      ],
+    })
+  );
+  assert.deepStrictEqual(value.ingredients, [
+    { amount: '', unit: '', name: 'Salt' },
+    { amount: '0.5', unit: 'dl', name: 'Mjölk' },
+  ]);
+});
+
 test('duplicate tags are removed ignoring case', () => {
   const { value } = normalizeRecipe(sampleRecipe({ tags: ['Middag', 'middag', ' Snabbt ', ''] }));
   assert.deepStrictEqual(value.tags, ['Middag', 'Snabbt']);
