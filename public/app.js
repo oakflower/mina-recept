@@ -3,6 +3,7 @@
 // The list filter lives in the hash query (?q=...&tag=...) so it survives navigation.
 
 const main = document.getElementById('main');
+const PAGE_SIZE = 30; // recipes shown at a time in the list
 
 // ---------- Small helpers ----------
 
@@ -124,10 +125,27 @@ async function showList(initialFilter) {
       resultsContainer.replaceChildren(el('p', {}, 'Inga recept hittades.'));
       return;
     }
-    const items = recipes.map((recipe) => el('li', {}, el('a', { class: 'recipe-card', href: `#/recept/${recipe.id}${queryString(filter)}` },
+    const list = el('ul', { class: 'recipe-list' });
+    resultsContainer.replaceChildren(list);
+    showMoreRecipes(recipes, list, 0);
+  }
+
+  // Adds the next page of recipes to the list, with a button for the rest.
+  function showMoreRecipes(recipes, list, start) {
+    const end = Math.min(start + PAGE_SIZE, recipes.length);
+    const items = recipes.slice(start, end).map((recipe) => el('li', {}, el('a', { class: 'recipe-card', href: `#/recept/${recipe.id}${queryString(filter)}` },
       el('span', { class: 'title' }, recipe.title),
       el('span', { class: 'meta' }, [formatMeta(recipe), recipe.tags.join(', ')].filter(Boolean).join(' · ')))));
-    resultsContainer.replaceChildren(el('ul', { class: 'recipe-list' }, items));
+    list.append(...items);
+    resultsContainer.querySelector('.show-more')?.remove();
+    if (end >= recipes.length) return;
+    const onShowMoreClick = () => {
+      showMoreRecipes(recipes, list, end);
+      list.children[end].querySelector('a').focus();
+    };
+    resultsContainer.append(el('p', { class: 'show-more' },
+      el('span', {}, `Visar ${end} av ${recipes.length} recept. `),
+      el('button', { type: 'button', class: 'button', onclick: onShowMoreClick }, 'Visa fler')));
   }
 
   function renderTags(tags) {
