@@ -7,8 +7,9 @@ The first version is for a single user, with no login. Users and sharing may com
 
 ### Scope
 - **MVP:** create, view, edit and delete recipes (title, description, ingredients with amount/unit/name, steps, servings, cooking time), free-text search on title and ingredients, tags/categories, and a "random recipe" function that picks a recipe at random from the saved ones (optionally within the current tag/search filter).
+- **Also built:** scaling of ingredient amounts by servings on the recipe page (`public/scale.js`; non-numeric amounts are left unchanged).
 - **Also built:** import of a recipe from an uploaded `.txt`/`.csv` file (`lib/importer.js`, `POST /api/import`, template in `public/mall.txt`). The file format is described by the template and the README.
-- **Later:** image, favorites, scaling servings, import from URL.
+- **Later:** image, favorites, import from URL.
 - **Far future:** login, sharing, shopping list, weekly menu.
 
 ## Tech stack
@@ -29,7 +30,7 @@ Why:
 - `lib/store.js` – the storage layer.
 - `lib/validate.js` – validation and normalization of recipe input.
 - `lib/importer.js` – turns the text of an uploaded file into recipe input.
-- `public/` – the frontend (`index.html`, `app.js`, `style.css`) and the import template `mall.txt`. Note that `public/app.js` is the frontend; the backend app is `lib/app.js`.
+- `public/` – the frontend (`index.html`, `app.js`, `scale.js`, `style.css`) and the import template `mall.txt`. Note that `public/app.js` is the frontend; the backend app is `lib/app.js`.
 - `test/` – tests, with shared helpers in `test/helpers.js`.
 
 ## Conventions

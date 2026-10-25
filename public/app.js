@@ -197,18 +197,50 @@ async function showRecipe(id, filter) {
     else showErrors(errorBox, deleted.data.errors);
   }
 
-  const ingredientItems = recipe.ingredients.map((ingredient) =>
-    el('li', {}, [ingredient.amount, ingredient.unit, ingredient.name].filter(Boolean).join(' ')));
+  const ingredientList = el('ul', { class: 'ingredients' });
+  const servingsInput = el('input', {
+    type: 'number', min: '1', id: 'servings', value: recipe.servings,
+    oninput: renderIngredients,
+  });
+
+  function currentServings() {
+    const servings = Number(servingsInput.value);
+    return servings > 0 ? servings : recipe.servings;
+  }
+
+  function renderIngredients() {
+    const servings = currentServings();
+    const items = recipe.ingredients.map((ingredient) => {
+      const amount = recipe.servings ? scaleAmount(ingredient.amount, recipe.servings, servings) : ingredient.amount;
+      return el('li', {}, [amount, ingredient.unit, ingredient.name].filter(Boolean).join(' '));
+    });
+    ingredientList.replaceChildren(...items);
+  }
+
+  function changeServings(change) {
+    servingsInput.value = Math.max(1, currentServings() + change);
+    renderIngredients();
+  }
+
+  // Hidden when the recipe has no servings, since there is nothing to scale from.
+  const servingsControl = recipe.servings
+    ? el('div', { class: 'servings-control' },
+      el('label', { for: 'servings' }, 'Portioner'),
+      el('button', { type: 'button', class: 'button', 'aria-label': 'Färre portioner', onclick: () => changeServings(-1) }, '−'),
+      servingsInput,
+      el('button', { type: 'button', class: 'button', 'aria-label': 'Fler portioner', onclick: () => changeServings(1) }, '+'))
+    : '';
   const stepItems = recipe.steps.map((step) => el('li', {}, step));
 
   setPage(recipe.title,
     el('a', { href: `#/${queryString(filter)}` }, '← Alla recept'),
     el('h1', {}, recipe.title),
-    el('p', { class: 'meta' }, formatMeta(recipe)),
+    el('p', { class: 'meta' }, recipe.cookingTimeMinutes ? `${recipe.cookingTimeMinutes} min` : ''),
     recipe.description ? el('p', {}, recipe.description) : '',
     recipe.tags.length ? el('p', {}, recipe.tags.map((tag) => el('span', { class: 'tag-chip' }, tag))) : '',
     el('h2', {}, 'Ingredienser'),
-    el('ul', { class: 'ingredients' }, ingredientItems),
+    servingsControl,
+    ingredientList,
     el('h2', {}, 'Gör så här'),
     el('ol', { class: 'steps' }, stepItems),
     errorBox,
@@ -216,6 +248,7 @@ async function showRecipe(id, filter) {
       el('button', { type: 'button', class: 'button primary', onclick: onRandomClick }, 'Slumpa ett nytt'),
       el('a', { class: 'button', href: `#/redigera/${id}` }, 'Redigera'),
       el('button', { type: 'button', class: 'button danger', onclick: onDeleteClick }, 'Ta bort')));
+  renderIngredients();
 }
 
 // ---------- Create / edit form ----------
