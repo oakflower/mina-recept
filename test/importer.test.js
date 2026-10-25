@@ -19,6 +19,12 @@ test('the downloadable template is itself a valid import', () => {
   assert.strictEqual(result.value.steps[0], 'Vispa ihop mjöl och hälften av mjölken till en slät smet.');
 });
 
+test('reads calories per serving from the Kalorier heading', () => {
+  const { recipe, errors } = parseRecipeText('Titel: Soppa\nKalorier: 450\nIngredienser:\n1;dl;vatten\nSteg:\n1. Koka');
+  assert.deepStrictEqual(errors, []);
+  assert.strictEqual(normalizeRecipe(recipe).value.caloriesPerServing, 450);
+});
+
 test('parses CSV exported from Excel (semicolons, padding, BOM, CRLF)', () => {
   const csv = [
     '﻿Titel;Soppa;;',

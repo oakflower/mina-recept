@@ -3,6 +3,7 @@
 // The list filter lives in the hash query (?q=...&tag=...) so it survives navigation.
 
 const main = document.getElementById('main');
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const PAGE_SIZE = 30; // recipes shown at a time in the list
 
 // ---------- Small helpers ----------
@@ -23,7 +24,10 @@ function el(tag, attributes = {}, ...children) {
 
 async function api(method, path, body) {
   const options = { method, headers: {} };
-  if (body !== undefined) {
+  if (body instanceof Blob) {
+    options.headers['Content-Type'] = body.type;
+    options.body = body;
+  } else if (body !== undefined) {
     options.headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
@@ -41,6 +45,7 @@ function queryString(filter) {
   const params = new URLSearchParams();
   if (filter.q) params.set('q', filter.q);
   if (filter.tag) params.set('tag', filter.tag);
+  if (filter.maxKcal) params.set('maxKcal', filter.maxKcal);
   const text = params.toString();
   return text ? `?${text}` : '';
 }
@@ -48,7 +53,7 @@ function queryString(filter) {
 function parseHash() {
   const [path, query = ''] = location.hash.slice(1).split('?');
   const params = new URLSearchParams(query);
-  return { segments: path.split('/').filter(Boolean), filter: { q: params.get('q') || '', tag: params.get('tag') || '' } };
+  return { segments: path.split('/').filter(Boolean), filter: { q: params.get('q') || '', tag: params.get('tag') || '', maxKcal: params.get('maxKcal') || '' } };
 }
 
 function showErrors(container, errors) {
@@ -67,6 +72,7 @@ function formatMeta(recipe) {
   const parts = [];
   if (recipe.servings) parts.push(`${recipe.servings} portioner`);
   if (recipe.cookingTimeMinutes) parts.push(`${recipe.cookingTimeMinutes} min`);
+  if (recipe.caloriesPerServing) parts.push(`${recipe.caloriesPerServing} kcal/portion`);
   return parts.join(' · ');
 }
 
@@ -103,6 +109,11 @@ async function showList(initialFilter) {
   const searchInput = el('input', {
     type: 'search', id: 'search', value: filter.q, autocomplete: 'off',
     oninput: () => { filter.q = searchInput.value; refresh(); },
+  });
+
+  const caloriesInput = el('input', {
+    type: 'number', min: '1', id: 'max-kcal', value: filter.maxKcal, autocomplete: 'off',
+    oninput: () => { filter.maxKcal = caloriesInput.value; refresh(); },
   });
 
   function rememberFilter() {
@@ -164,18 +175,23 @@ async function showList(initialFilter) {
     return openRandomRecipe(filter, errorBox);
   }
 
+  const importErrorBox = el('div', { role: 'alert' });
+
   async function onFileChosen(event) {
     const file = event.target.files[0];
     if (!file) return;
-    const result = await api('POST', '/import', { text: await file.text() });
+    const isWord = file.name.toLowerCase().endsWith('.docx');
+    const result = await api('POST', '/import', isWord ? file.slice(0, file.size, DOCX_TYPE) : { text: await file.text() });
+    showErrors(importErrorBox, []);
     if (result.ok) location.hash = `#/recept/${result.data.id}`;
-    else showErrors(errorBox, result.data.errors);
+    else showErrors(importErrorBox, result.data.errors);
     event.target.value = '';
   }
 
   setPage('',
     el('h1', {}, 'Mina recept'),
     el('div', { class: 'field' }, el('label', { for: 'search' }, 'Sök på titel eller ingrediens'), searchInput),
+    el('div', { class: 'field' }, el('label', { for: 'max-kcal' }, 'Högst kcal per portion'), caloriesInput),
     tagContainer,
     el('div', { class: 'actions' },
       el('button', { type: 'button', class: 'button primary', onclick: onRandomClick }, 'Slumpa recept'),
@@ -184,10 +200,11 @@ async function showList(initialFilter) {
     resultsContainer,
     el('section', { class: 'import-box' },
       el('h2', {}, 'Importera från fil'),
-      el('p', {}, 'Ladda upp en .txt- eller .csv-fil (från Excel: spara som CSV UTF-8). Receptet sparas direkt.'),
+      el('p', {}, 'Ladda upp en .txt-, .csv- eller Word-fil (.docx). Från Excel: spara som CSV UTF-8. I Word skriver du rubrikerna som i mallen, en post per stycke. Receptet sparas direkt.'),
       el('p', {}, el('a', { href: 'mall.txt', download: 'recept-mall.txt' }, 'Ladda ner mall')),
       el('label', { for: 'import-file' }, 'Välj fil'),
-      el('input', { type: 'file', id: 'import-file', accept: '.txt,.csv,text/plain,text/csv', onchange: onFileChosen })));
+      el('input', { type: 'file', id: 'import-file', accept: `.txt,.csv,.docx,text/plain,text/csv,${DOCX_TYPE}`, onchange: onFileChosen }),
+      importErrorBox));
 
   const [tags] = await Promise.all([api('GET', '/tags'), refresh()]);
   if (tags.ok) renderTags(tags.data);
@@ -253,7 +270,10 @@ async function showRecipe(id, filter) {
   setPage(recipe.title,
     el('a', { href: `#/${queryString(filter)}` }, '← Alla recept'),
     el('h1', {}, recipe.title),
-    el('p', { class: 'meta' }, recipe.cookingTimeMinutes ? `${recipe.cookingTimeMinutes} min` : ''),
+    el('p', { class: 'meta' }, [
+      recipe.cookingTimeMinutes ? `${recipe.cookingTimeMinutes} min` : '',
+      recipe.caloriesPerServing ? `${recipe.caloriesPerServing} kcal/portion` : '',
+    ].filter(Boolean).join(' · ')),
     recipe.description ? el('p', {}, recipe.description) : '',
     recipe.tags.length ? el('p', {}, recipe.tags.map((tag) => el('span', { class: 'tag-chip' }, tag))) : '',
     el('h2', {}, 'Ingredienser'),
@@ -335,6 +355,7 @@ function readForm(form) {
     description: fieldValue(form, 'description'),
     servings: fieldValue(form, 'servings'),
     cookingTimeMinutes: fieldValue(form, 'cookingTimeMinutes'),
+    caloriesPerServing: fieldValue(form, 'caloriesPerServing'),
     tags: fieldValue(form, 'tags').split(','),
     ingredients,
     steps,
@@ -342,7 +363,7 @@ function readForm(form) {
 }
 
 async function showForm(id) {
-  let recipe = { title: '', description: '', servings: '', cookingTimeMinutes: '', ingredients: [], steps: [], tags: [] };
+  let recipe = { title: '', description: '', servings: '', cookingTimeMinutes: '', caloriesPerServing: '', ingredients: [], steps: [], tags: [] };
   if (id) {
     const result = await api('GET', `/recipes/${id}`);
     if (!result.ok) {
@@ -378,7 +399,8 @@ async function showForm(id) {
     el('div', { class: 'field' }, el('label', { for: 'description' }, 'Beskrivning'), el('textarea', { id: 'description', 'data-field': 'description' }, recipe.description)),
     el('div', { class: 'field-row' },
       el('div', { class: 'field' }, el('label', { for: 'servings' }, 'Portioner'), el('input', { type: 'number', min: '1', id: 'servings', 'data-field': 'servings', value: recipe.servings ?? '' })),
-      el('div', { class: 'field' }, el('label', { for: 'time' }, 'Tid (minuter)'), el('input', { type: 'number', min: '1', id: 'time', 'data-field': 'cookingTimeMinutes', value: recipe.cookingTimeMinutes ?? '' }))),
+      el('div', { class: 'field' }, el('label', { for: 'time' }, 'Tid (minuter)'), el('input', { type: 'number', min: '1', id: 'time', 'data-field': 'cookingTimeMinutes', value: recipe.cookingTimeMinutes ?? '' })),
+      el('div', { class: 'field' }, el('label', { for: 'calories' }, 'Kalorier per portion (kcal)'), el('input', { type: 'number', min: '1', id: 'calories', 'data-field': 'caloriesPerServing', value: recipe.caloriesPerServing ?? '' }))),
     el('div', { class: 'field' }, el('label', { for: 'tags' }, 'Taggar (separera med komma)'), el('input', { type: 'text', id: 'tags', 'data-field': 'tags', value: recipe.tags.join(', ') })),
     el('fieldset', {}, el('legend', {}, 'Ingredienser'), ingredientList),
     el('fieldset', {}, el('legend', {}, 'Steg'), stepList),

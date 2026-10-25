@@ -77,6 +77,24 @@ test('tag filter matches case-insensitively and can combine with search', () => 
   assert.deepStrictEqual(store.list({ tag: 'Middag', search: 'ste' }).map((r) => r.title), ['Stek']);
 });
 
+test('calorie filter keeps recipes at or below the limit and drops those without calories', () => {
+  const store = createStore(makeTempFilePath());
+  store.create(sampleRecipe({ title: 'Lätt', caloriesPerServing: 300 }));
+  store.create(sampleRecipe({ title: 'Exakt', caloriesPerServing: 500 }));
+  store.create(sampleRecipe({ title: 'Tung', caloriesPerServing: 800 }));
+  store.create(sampleRecipe({ title: 'Okänd', caloriesPerServing: null }));
+  assert.deepStrictEqual(store.list({ maxCalories: 500 }).map((r) => r.title), ['Exakt', 'Lätt']);
+  assert.strictEqual(store.list().length, 4);
+});
+
+test('pickRandom respects the calorie filter', () => {
+  const store = createStore(makeTempFilePath(), () => 0);
+  store.create(sampleRecipe({ title: 'Lätt', caloriesPerServing: 300 }));
+  store.create(sampleRecipe({ title: 'Tung', caloriesPerServing: 800 }));
+  assert.strictEqual(store.pickRandom({ maxCalories: 400 }).title, 'Lätt');
+  assert.strictEqual(store.pickRandom({ maxCalories: 100 }), null);
+});
+
 test('listTags returns unique tags sorted, ignoring case differences', () => {
   const store = createStore(makeTempFilePath());
   store.create(sampleRecipe({ tags: ['Middag', 'Snabbt'] }));

@@ -2,6 +2,7 @@ Titel: Pannkakor
 Beskrivning: Klassiska tunna pannkakor.
 Portioner: 4
 Tid: 30
+Kalorier: 350
 Taggar: Frukost, Barnvänligt
 Ingredienser:
 3;dl;vetemjöl

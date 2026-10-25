@@ -43,6 +43,13 @@ test('servings and time are optional but must be positive numbers', () => {
   assert.strictEqual(normalizeRecipe(sampleRecipe({ servings: '4' })).value.servings, 4);
 });
 
+test('calories per serving are optional but must be a positive number', () => {
+  assert.strictEqual(normalizeRecipe(sampleRecipe()).value.caloriesPerServing, null);
+  assert.strictEqual(normalizeRecipe(sampleRecipe({ caloriesPerServing: '520' })).value.caloriesPerServing, 520);
+  assert.ok(normalizeRecipe(sampleRecipe({ caloriesPerServing: 0 })).errors);
+  assert.ok(normalizeRecipe(sampleRecipe({ caloriesPerServing: 'abc' })).errors);
+});
+
 test('a null ingredient is treated as an empty row instead of crashing', () => {
   const { errors } = normalizeRecipe(sampleRecipe({ ingredients: [null] }));
   assert.ok(errors.includes('Minst en ingrediens krävs.'));

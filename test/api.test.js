@@ -1,9 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
+const path = require('node:path');
 const { createApp } = require('../lib/app');
 const { createStore } = require('../lib/store');
 const { makeTempFilePath, sampleRecipe } = require('./helpers');
+
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 // Starts the app on a random port with its own temp file; returns a small client.
 async function startServer(random = () => 0, filePath = makeTempFilePath()) {
@@ -14,7 +17,10 @@ async function startServer(random = () => 0, filePath = makeTempFilePath()) {
 
   async function call(method, path, body) {
     const options = { method, headers: {} };
-    if (body !== undefined) {
+    if (Buffer.isBuffer(body)) {
+      options.headers['Content-Type'] = DOCX_TYPE;
+      options.body = body;
+    } else if (body !== undefined) {
       options.headers['Content-Type'] = 'application/json';
       options.body = typeof body === 'string' ? body : JSON.stringify(body);
     }
@@ -78,6 +84,21 @@ test('GET /api/recipes lists, searches and filters by tag', () =>
 
     const byTag = await call('GET', '/api/recipes?tag=Frukost');
     assert.deepStrictEqual(byTag.body.map((r) => r.title), ['Gröt']);
+  }));
+
+test('GET /api/recipes and /random filter on maxKcal', () =>
+  withServer(async (call) => {
+    await call('POST', '/api/recipes', sampleRecipe({ title: 'Lätt', caloriesPerServing: 300 }));
+    await call('POST', '/api/recipes', sampleRecipe({ title: 'Tung', caloriesPerServing: 800 }));
+
+    const list = await call('GET', '/api/recipes?maxKcal=400');
+    assert.deepStrictEqual(list.body.map((r) => r.title), ['Lätt']);
+
+    const picked = await call('GET', '/api/recipes/random?maxKcal=400');
+    assert.strictEqual(picked.body.title, 'Lätt');
+
+    const none = await call('GET', '/api/recipes/random?maxKcal=100');
+    assert.strictEqual(none.status, 404);
   }));
 
 test('GET /api/recipes/:id returns 404 for unknown id', () =>
@@ -180,4 +201,21 @@ test('POST /api/import returns 413 for a body over the size limit', () =>
     const response = await call('POST', '/api/import', { text: 'x'.repeat(1024 * 1024 + 1) });
     assert.strictEqual(response.status, 413);
     assert.deepStrictEqual(response.body.errors, ['Filen är för stor (högst 1 MB).']);
+  }));
+
+test('POST /api/import saves a recipe from a Word file', () =>
+  withServer(async (call) => {
+    const docx = fs.readFileSync(path.join(__dirname, 'fixtures', 'recept.docx'));
+    const response = await call('POST', '/api/import', docx);
+    assert.strictEqual(response.status, 201);
+    assert.strictEqual(response.body.title, 'Gröt');
+    assert.strictEqual(response.body.ingredients.length, 2);
+    assert.deepStrictEqual(response.body.steps, ['Koka']);
+  }));
+
+test('POST /api/import returns 400 for a Word file that cannot be read', () =>
+  withServer(async (call) => {
+    const response = await call('POST', '/api/import', Buffer.from('inte en riktig docx'));
+    assert.strictEqual(response.status, 400);
+    assert.deepStrictEqual(response.body.errors, ['Word-filen kunde inte läsas.']);
   }));

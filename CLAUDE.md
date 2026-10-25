@@ -8,7 +8,7 @@ The first version is for a single user, with no login. Users and sharing may com
 ### Scope
 - **MVP:** create, view, edit and delete recipes (title, description, ingredients with amount/unit/name, steps, servings, cooking time), free-text search on title and ingredients, tags/categories, and a "random recipe" function that picks a recipe at random from the saved ones (optionally within the current tag/search filter).
 - **Also built:** scaling of ingredient amounts by servings on the recipe page (`public/scale.js`; non-numeric amounts are left unchanged).
-- **Also built:** import of a recipe from an uploaded `.txt`/`.csv` file (`lib/importer.js`, `POST /api/import`, template in `public/mall.txt`). The file format is described by the template and the README.
+- **Also built:** import of a recipe from an uploaded `.txt`/`.csv`/`.docx` file (Word text is extracted with `mammoth`) (`lib/importer.js`, `POST /api/import`, template in `public/mall.txt`). The file format is described by the template and the README.
 - **Later:** image, favorites, import from URL.
 - **Far future:** login, sharing, shopping list, weekly menu.
 

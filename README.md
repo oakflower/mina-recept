@@ -44,6 +44,7 @@ Titel: Pannkakor
 Beskrivning: Klassiska tunna pannkakor.
 Portioner: 4
 Tid: 30
+Kalorier: 350
 Taggar: Frukost, Barnvänligt
 Ingredienser:
 3;dl;vetemjöl
@@ -54,7 +55,7 @@ Steg:
 ```
 
 - Ingredienser skrivs `mängd;enhet;namn`. En rad med bara ett namn går också bra.
-- Tid anges i minuter.
+- Tid anges i minuter. Kalorier anges som kcal per portion och kan användas för att filtrera listan.
 - Från Excel: spara som **CSV UTF-8**, annars blir å, ä och ö fel.
 
 ## Teknik
