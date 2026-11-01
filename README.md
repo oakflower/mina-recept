@@ -58,11 +58,33 @@ Steg:
 - Tid anges i minuter. Kalorier anges som kcal per portion och kan användas för att filtrera listan.
 - Från Excel: spara som **CSV UTF-8**, annars blir å, ä och ö fel.
 
+## Kvalitetskontroll och deploy
+
+Kör lint och tester lokalt:
+
+```bash
+npm run lint
+npm test
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) kör lint och tester vid push till `main` och vid pull requests mot `main`. Misslyckas något av dem stoppas körningen. Projektet har inget byggsteg. Vid en lyckad push till `main` deployas appen till [Fly.io](https://fly.io) (`fly.toml`, `Dockerfile`). Recepten ligger på en Fly Volume monterad på `/app/data`, så de finns kvar mellan deployer.
+
+Engångsuppsättning av Fly:
+
+```bash
+fly auth login
+fly launch --no-deploy
+fly volumes create recipe_data --size 1
+fly tokens create deploy
+```
+
+Lägg token från sista kommandot som GitHub Secret `FLY_API_TOKEN` (Settings, Secrets and variables, Actions). Håll appen på en maskin (`fly scale count 1`), eftersom en volym hör till en enda maskin.
+
 ## Teknik
 
 - Node.js och Express, REST-API under `/api`
 - Frontend i ren HTML, CSS och JavaScript utan byggsteg, serverad statiskt av Express
 - Lagring i en JSON-fil bakom ett eget lagringslager (`lib/store.js`)
-- Tester med Nodes inbyggda testkörare (`node --test`)
+- Tester med Nodes inbyggda testkörare (`node --test`), lint med ESLint
 
 Projektets riktlinjer finns i [CLAUDE.md](CLAUDE.md).

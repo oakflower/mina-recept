@@ -35,7 +35,7 @@ async function api(method, path, body) {
     const response = await fetch(`/api${path}`, options);
     const data = response.status === 204 ? null : await response.json();
     return { ok: response.ok, status: response.status, data };
-  } catch (error) {
+  } catch {
     // Network failure or a non-JSON response: report it like any other API error.
     return { ok: false, status: 0, data: { errors: ['Kunde inte nå servern. Försök igen.'] } };
   }
