@@ -1,31 +1,35 @@
-# Change `app` to the name you choose in `fly launch`.
-app = "mina-recept"
-primary_region = "arn"
+# fly.toml app configuration file generated for mina-recept on 2026-11-01T12:12:44+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'mina-recept'
+primary_region = 'arn'
 
 [build]
-
 [env]
-  PORT = "8080"
+  PORT = '8080'
 
-# Persistent disk for data/recipes.json. Create it once: fly volumes create recipe_data --size 1
-[mounts]
-  source = "recipe_data"
-  destination = "/app/data"
+[[mounts]]
+  source = 'recipe_data'
+  destination = '/app/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
   [[http_service.checks]]
-    method = "GET"
-    path = "/"
-    interval = "30s"
-    timeout = "5s"
-    grace_period = "10s"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/'
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
+  cpus = 1
+  memory_mb = 256
